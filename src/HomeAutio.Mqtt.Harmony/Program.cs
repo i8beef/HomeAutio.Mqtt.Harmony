@@ -1,7 +1,6 @@
 ﻿using HarmonyHub;
 using System.Configuration;
 using Topshelf;
-using uPLibrary.Networking.M2Mqtt;
 
 namespace HomeAutio.Mqtt.Harmony
 {
@@ -32,8 +31,14 @@ namespace HomeAutio.Mqtt.Harmony
                     s.WhenStopped(tc => tc.Stop());
                 });
 
+                x.EnableServiceRecovery(r =>
+                {
+                    r.RestartService(0);
+                    r.RestartService(0);
+                    r.RestartService(0);
+                });
+
                 x.RunAsLocalSystem();
-                x.AddDependency("HomeAutio.Mqtt.Broker");
                 x.UseAssemblyInfoForServiceInfo();
             });
         }
