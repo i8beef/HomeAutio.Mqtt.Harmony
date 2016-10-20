@@ -140,8 +140,9 @@ namespace HomeAutio.Mqtt.Harmony
                         var commandTopic = $"{_topicRoot}/devices/{harmonyDevice.Label.Sluggify()}/{controlGroup.Name.Sluggify()}/{control.Name.Sluggify()}/set";
                         device.Controls.Add(new ButtonControl { Name = controlGroup.Name + " " + control.Name, CommandTopic = commandTopic });
 
-                        // Add mapping for subscribed topic to Harmony control action
-                        _topicActionMap.Add(commandTopic, control.Action);
+                        // Add mapping for subscribed topic to Harmony control action, ignoring duplicates
+                        if (!_topicActionMap.ContainsKey(commandTopic))
+                            _topicActionMap.Add(commandTopic, control.Action);
                     }
                 }
 
