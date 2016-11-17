@@ -5,6 +5,7 @@ using HomeAutio.Mqtt.Core.Entities;
 using HomeAutio.Mqtt.Core.Utilities;
 using Newtonsoft.Json;
 using NLog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -44,10 +45,7 @@ namespace HomeAutio.Mqtt.Harmony
             _client.MessageReceived += (object sender, HarmonyHub.Events.MessageReceivedEventArgs e) => { _log.Debug("Harmony Message received: " + e.Message); };
             _client.Error += (object sender, System.IO.ErrorEventArgs e) => {
                 _log.Error(e.GetException());
-
-                // Harmony stream parsing is lost at this point, restart the client (need to test this)
-                _client.Close();
-                _client.Connect();
+                throw new Exception("Harmony connection lost");
             };
         }
 

@@ -37,8 +37,8 @@
       <HintPath>..\packages\HarmonyHub.2.0.0.27\lib\net452\HarmonyHub.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="HomeAutio.Mqtt.Core, Version=1.0.0.14, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\HomeAutio.Mqtt.Core.1.0.0.14\lib\net452\HomeAutio.Mqtt.Core.dll</HintPath>
+    <Reference Include="HomeAutio.Mqtt.Core, Version=1.0.0.18, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\HomeAutio.Mqtt.Core.1.0.0.18\lib\net452\HomeAutio.Mqtt.Core.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="M2Mqtt.Net, Version=4.3.0.0, Culture=neutral, processorArchitecture=MSIL">
