@@ -13,10 +13,14 @@ namespace HomeAutio.Mqtt.Harmony
             var brokerUsername = ConfigurationManager.AppSettings["brokerUsername"];
             var brokerPassword = ConfigurationManager.AppSettings["brokerPassword"];
 
+
+            var bypassLogitech = false;
+            bool.TryParse(ConfigurationManager.AppSettings["bypassLogitechLogin"], out bypassLogitech);
+
             var harmonyIp = ConfigurationManager.AppSettings["harmonyIp"];
             var harmonyUsername = ConfigurationManager.AppSettings["harmonyUsername"];
             var harmonyPassword = ConfigurationManager.AppSettings["harmonyPassword"];
-            var harmonyClient = new Client(harmonyIp, harmonyUsername, harmonyPassword);
+            var harmonyClient = new Client(harmonyIp, harmonyUsername, harmonyPassword, bypassLogitech);
 
             var harmonyName = ConfigurationManager.AppSettings["harmonyName"];
 

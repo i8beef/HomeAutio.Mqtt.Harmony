@@ -33,8 +33,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="HarmonyHub, Version=2.0.0.27, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\HarmonyHub.2.0.0.27\lib\net452\HarmonyHub.dll</HintPath>
+    <Reference Include="HarmonyHub, Version=2.0.0.30, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\HarmonyHub.2.0.0.30\lib\net452\HarmonyHub.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="HomeAutio.Mqtt.Core, Version=1.0.0.18, Culture=neutral, processorArchitecture=MSIL">
