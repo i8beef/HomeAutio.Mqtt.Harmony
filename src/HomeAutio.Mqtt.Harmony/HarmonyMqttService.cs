@@ -1,5 +1,6 @@
 ﻿using HarmonyHub;
 using HarmonyHub.Config;
+using HarmonyHub.Events;
 using HomeAutio.Mqtt.Core;
 using HomeAutio.Mqtt.Core.Entities;
 using HomeAutio.Mqtt.Core.Utilities;
@@ -130,11 +131,11 @@ namespace HomeAutio.Mqtt.Harmony
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void Harmony_CurrentActivityUpdated(object sender, int activityId)
+        private void Harmony_CurrentActivityUpdated(object sender, ActivityUpdatedEventArgs e)
         {
             try
             {
-                var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == activityId.ToString())?.Label;
+                var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == e.Id.ToString())?.Label;
                 _log.Debug("Harmony current activity updated: " + currentActivity);
 
                 _mqttClient.Publish(_topicRoot + "/activity", Encoding.UTF8.GetBytes(currentActivity), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
