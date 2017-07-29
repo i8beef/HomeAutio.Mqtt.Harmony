@@ -1,21 +1,29 @@
-﻿using HarmonyHub;
-using System.Configuration;
+﻿using System.Configuration;
+using HarmonyHub;
+using NLog;
 using Topshelf;
 
 namespace HomeAutio.Mqtt.Harmony
 {
-    class Program
+    /// <summary>
+    /// Main program entrypoint.
+    /// </summary>
+    public class Program
     {
-        static void Main(string[] args)
+        /// <summary>
+        /// Main method.
+        /// </summary>
+        /// <param name="args">Command line arguments.</param>
+        public static void Main(string[] args)
         {
+            var log = LogManager.GetCurrentClassLogger();
+
             var brokerIp = ConfigurationManager.AppSettings["brokerIp"];
             var brokerPort = int.Parse(ConfigurationManager.AppSettings["brokerPort"]);
             var brokerUsername = ConfigurationManager.AppSettings["brokerUsername"];
             var brokerPassword = ConfigurationManager.AppSettings["brokerPassword"];
 
-
-            var bypassLogitech = false;
-            bool.TryParse(ConfigurationManager.AppSettings["bypassLogitechLogin"], out bypassLogitech);
+            bool.TryParse(ConfigurationManager.AppSettings["bypassLogitechLogin"], out bool bypassLogitech);
 
             var harmonyIp = ConfigurationManager.AppSettings["harmonyIp"];
             var harmonyUsername = ConfigurationManager.AppSettings["harmonyUsername"];
@@ -27,6 +35,7 @@ namespace HomeAutio.Mqtt.Harmony
             HostFactory.Run(x =>
             {
                 x.UseNLog();
+                x.OnException(ex => log.Error(ex));
 
                 x.Service<HarmonyMqttService>(s =>
                 {
