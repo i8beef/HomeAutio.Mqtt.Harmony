@@ -107,7 +107,7 @@ namespace HomeAutio.Mqtt.Harmony
             {
                 var command = _topicActionMap[e.Topic];
                 if (command != null)
-                    _client.SendCommandAsync(command);
+                    _client.SendKeyPressAsync(command).GetAwaiter().GetResult();
             }
         }
 
