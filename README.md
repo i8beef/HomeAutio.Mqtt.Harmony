@@ -6,5 +6,3 @@ Logitech Harmony to MQTT bridge
 
 # Documentation
 See the Wiki.
-
-
