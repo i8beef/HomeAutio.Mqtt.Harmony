@@ -1,59 +1,78 @@
-﻿using System.Configuration;
+﻿using System;
+using System.Threading.Tasks;
 using HarmonyHub;
-using NLog;
-using Topshelf;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace HomeAutio.Mqtt.Harmony
 {
     /// <summary>
-    /// Main program entrypoint.
+    /// Main program entry point.
     /// </summary>
     public class Program
     {
         /// <summary>
-        /// Main method.
+        /// Main program entry point.
         /// </summary>
-        /// <param name="args">Command line arguments.</param>
+        /// <param name="args">Arguments.</param>
         public static void Main(string[] args)
         {
-            var log = LogManager.GetCurrentClassLogger();
+            MainAsync(args).GetAwaiter().GetResult();
+        }
 
-            var brokerIp = ConfigurationManager.AppSettings["brokerIp"];
-            var brokerPort = int.Parse(ConfigurationManager.AppSettings["brokerPort"]);
-            var brokerUsername = ConfigurationManager.AppSettings["brokerUsername"];
-            var brokerPassword = ConfigurationManager.AppSettings["brokerPassword"];
+        /// <summary>
+        /// Main program entry point.
+        /// </summary>
+        /// <param name="args">Arguments.</param>
+        /// <returns>Awaitable <see cref="Task" />.</returns>
+        public static async Task MainAsync(string[] args)
+        {
+            // Setup logging
+            Log.Logger = new LoggerConfiguration()
+              .Enrich.FromLogContext()
+              .WriteTo.Console()
+              .WriteTo.RollingFile(@"logs/HomeAutio.Mqtt.Harmony.log")
+              .CreateLogger();
 
-            bool.TryParse(ConfigurationManager.AppSettings["bypassLogitechLogin"], out bool bypassLogitech);
-
-            var harmonyIp = ConfigurationManager.AppSettings["harmonyIp"];
-            var harmonyUsername = ConfigurationManager.AppSettings["harmonyUsername"];
-            var harmonyPassword = ConfigurationManager.AppSettings["harmonyPassword"];
-            var harmonyClient = new Client(harmonyIp, harmonyUsername, harmonyPassword, 2000, bypassLogitech);
-
-            var harmonyName = ConfigurationManager.AppSettings["harmonyName"];
-
-            HostFactory.Run(x =>
-            {
-                x.UseNLog();
-                x.OnException(ex => log.Error(ex));
-
-                x.Service<HarmonyMqttService>(s =>
+            var hostBuilder = new HostBuilder()
+                .ConfigureAppConfiguration((hostContext, config) =>
                 {
-                    s.ConstructUsing(name => new HarmonyMqttService(harmonyClient, harmonyName, brokerIp, brokerPort, brokerUsername, brokerPassword));
-                    s.WhenStarted(tc => tc.Start());
-                    s.WhenStopped(tc => tc.Stop());
+                    config.SetBasePath(Environment.CurrentDirectory);
+                    config.AddJsonFile("appsettings.json", optional: false);
+                })
+                .ConfigureLogging((hostingContext, logging) =>
+                {
+                    logging.AddSerilog();
+                })
+                .ConfigureServices((hostContext, services) =>
+                {
+                    // Setup client
+                    services.AddScoped<Client>(serviceProvider =>
+                    {
+                        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+                        return new Client(configuration.GetValue<string>("harmonyHost"));
+                    });
+
+                    // Setup service instance
+                    services.AddScoped<IHostedService, HarmonyMqttService>(serviceProvider =>
+                    {
+                        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+                        return new HarmonyMqttService(
+                            serviceProvider.GetRequiredService<IApplicationLifetime>(),
+                            serviceProvider.GetRequiredService<ILogger<HarmonyMqttService>>(),
+                            serviceProvider.GetRequiredService<Client>(),
+                            configuration.GetValue<string>("harmonyName"),
+                            configuration.GetValue<string>("brokerIp"),
+                            configuration.GetValue<int>("brokerPort"),
+                            configuration.GetValue<string>("brokerUsername"),
+                            configuration.GetValue<string>("brokerPassword"));
+                    });
                 });
 
-                x.EnableServiceRecovery(r =>
-                {
-                    r.RestartService(0);
-                    r.RestartService(0);
-                    r.RestartService(0);
-                });
-
-                x.RunAsLocalSystem();
-                x.UseAssemblyInfoForServiceInfo();
-            });
+            await hostBuilder.RunConsoleAsync();
         }
     }
 }

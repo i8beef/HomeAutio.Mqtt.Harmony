@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using HarmonyHub;
 using HarmonyHub.Config;
 using HarmonyHub.Events;
 using HomeAutio.Mqtt.Core;
 using HomeAutio.Mqtt.Core.Entities;
 using HomeAutio.Mqtt.Core.Utilities;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using MQTTnet;
 using Newtonsoft.Json;
-using NLog;
-using uPLibrary.Networking.M2Mqtt.Messages;
 
 namespace HomeAutio.Mqtt.Harmony
 {
@@ -19,7 +21,7 @@ namespace HomeAutio.Mqtt.Harmony
     /// </summary>
     public class HarmonyMqttService : ServiceBase
     {
-        private ILogger _log = LogManager.GetCurrentClassLogger();
+        private ILogger<HarmonyMqttService> _log;
         private bool _disposed = false;
 
         private Client _client;
@@ -34,15 +36,26 @@ namespace HomeAutio.Mqtt.Harmony
         /// <summary>
         /// Initializes a new instance of the <see cref="HarmonyMqttService"/> class.
         /// </summary>
+        /// <param name="applicationLifetime">Application lifetime instance.</param>
+        /// <param name="logger">Logging instance.</param>
         /// <param name="harmonyClient">The Harmony client.</param>
         /// <param name="harmonyName">The Harmony name.</param>
         /// <param name="brokerIp">MQTT broker IP.</param>
         /// <param name="brokerPort">MQTT broker port.</param>
         /// <param name="brokerUsername">MQTT broker username.</param>
         /// <param name="brokerPassword">MQTT broker password.</param>
-        public HarmonyMqttService(Client harmonyClient, string harmonyName, string brokerIp, int brokerPort = 1883, string brokerUsername = null, string brokerPassword = null)
-            : base(brokerIp, brokerPort, brokerUsername, brokerPassword, "harmony/" + harmonyName)
+        public HarmonyMqttService(
+            IApplicationLifetime applicationLifetime,
+            ILogger<HarmonyMqttService> logger,
+            Client harmonyClient,
+            string harmonyName,
+            string brokerIp,
+            int brokerPort = 1883,
+            string brokerUsername = null,
+            string brokerPassword = null)
+            : base(applicationLifetime, logger, brokerIp, brokerPort, brokerUsername, brokerPassword, "harmony/" + harmonyName)
         {
+            _log = logger;
             _topicActionMap = new Dictionary<string, string>();
             SubscribedTopics.Add(TopicRoot + "/devices/+/+/+/set");
             SubscribedTopics.Add(TopicRoot + "/activity/set");
@@ -54,33 +67,31 @@ namespace HomeAutio.Mqtt.Harmony
             _client.CurrentActivityUpdated += Harmony_CurrentActivityUpdated;
 
             // Harmony client logging
-            _client.MessageSent += (object sender, HarmonyHub.Events.MessageSentEventArgs e) => { _log.Debug("Harmony Message sent: " + e.Message); };
-            _client.MessageReceived += (object sender, HarmonyHub.Events.MessageReceivedEventArgs e) => { _log.Debug("Harmony Message received: " + e.Message); };
+            _client.MessageSent += (object sender, MessageSentEventArgs e) => { _log.LogDebug("Harmony Message sent: " + e.Message); };
+            _client.MessageReceived += (object sender, MessageReceivedEventArgs e) => { _log.LogDebug("Harmony Message received: " + e.Message); };
             _client.Error += (object sender, System.IO.ErrorEventArgs e) =>
             {
-                _log.Error(e.GetException());
+                var exception = e.GetException();
+                _log.LogError(exception, exception.Message);
                 throw new Exception("Harmony connection lost");
             };
         }
 
         #region Service implementation
 
-        /// <summary>
-        /// Service Start action.
-        /// </summary>
-        protected override void StartService()
+        /// <inheritdoc />
+        protected override async Task StartServiceAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             // Connect to Harmony
             _client.Connect();
-            GetConfig();
+            await GetConfigAsync()
+                .ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Service Stop action.
-        /// </summary>
-        protected override void StopService()
+        /// <inheritdoc />
+        protected override Task StopServiceAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
-            Dispose();
+            return Task.CompletedTask;
         }
 
         #endregion
@@ -92,22 +103,28 @@ namespace HomeAutio.Mqtt.Harmony
         /// </summary>
         /// <param name="sender">Event sender.</param>
         /// <param name="e">Event args.</param>
-        protected override void Mqtt_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
+        protected override async void Mqtt_MqttMsgPublishReceived(object sender, MqttApplicationMessageReceivedEventArgs e)
         {
-            var message = Encoding.UTF8.GetString(e.Message);
-            _log.Debug("MQTT message received for topic " + e.Topic + ": " + message);
+            var message = e.ApplicationMessage.ConvertPayloadToString();
+            _log.LogDebug("MQTT message received for topic " + e.ApplicationMessage.Topic + ": " + message);
 
-            if (e.Topic == TopicRoot + "/activity/set")
+            if (e.ApplicationMessage.Topic == TopicRoot + "/activity/set")
             {
                 var activity = _harmonyConfig?.Activity?.FirstOrDefault(x => x.Label == message);
                 if (activity != null)
-                    _client.StartActivityAsync(int.Parse(activity.Id)).GetAwaiter().GetResult();
+                {
+                    await _client.StartActivityAsync(int.Parse(activity.Id))
+                        .ConfigureAwait(false);
+                }
             }
-            else if (_topicActionMap.ContainsKey(e.Topic))
+            else if (_topicActionMap.ContainsKey(e.ApplicationMessage.Topic))
             {
-                var command = _topicActionMap[e.Topic];
+                var command = _topicActionMap[e.ApplicationMessage.Topic];
                 if (command != null)
-                    _client.SendKeyPressAsync(command).GetAwaiter().GetResult();
+                {
+                    await _client.SendCommandAsync(command)
+                        .ConfigureAwait(false);
+                }
             }
         }
 
@@ -120,20 +137,28 @@ namespace HomeAutio.Mqtt.Harmony
         /// </summary>
         /// <param name="sender">Event sender.</param>
         /// <param name="e">Event args.</param>
-        private void Harmony_CurrentActivityUpdated(object sender, ActivityUpdatedEventArgs e)
+        private async void Harmony_CurrentActivityUpdated(object sender, ActivityUpdatedEventArgs e)
         {
             var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == e.Id.ToString())?.Label;
-            _log.Debug("Harmony current activity updated: " + currentActivity);
+            _log.LogDebug("Harmony current activity updated: " + currentActivity);
 
-            MqttClient.Publish(TopicRoot + "/activity", Encoding.UTF8.GetBytes(currentActivity), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+            await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
+                .WithTopic(TopicRoot + "/activity")
+                .WithPayload(currentActivity)
+                .WithAtLeastOnceQoS()
+                .WithRetainFlag()
+                .Build())
+                .ConfigureAwait(false);
         }
 
         /// <summary>
         /// Maps Harmony device actions to subscription topics.
         /// </summary>
-        private void GetConfig()
+        /// <returns>An awaitable <see cref="Task"/>.</returns>
+        private async Task GetConfigAsync()
         {
-            _harmonyConfig = _client.GetConfigAsync().GetAwaiter().GetResult();
+            _harmonyConfig = await _client.GetConfigAsync()
+                .ConfigureAwait(false);
 
             // Wipe topic to Harmony action map for reload
             if (_topicActionMap.Count > 0)
@@ -179,7 +204,8 @@ namespace HomeAutio.Mqtt.Harmony
 
             // Add a Selector for the hub itself at {TopicRoot}/activity/set
             // Listen at topic {TopicRoot}/activity/set
-            var currentActivityId = _client.GetCurrentActivityIdAsync().GetAwaiter().GetResult();
+            var currentActivityId = await _client.GetCurrentActivityIdAsync()
+                .ConfigureAwait(false);
             var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == currentActivityId.ToString())?.Label;
             var activityStateTopic = $"{TopicRoot}/activity";
             var activityCommandTopic = $"{TopicRoot}/activity/set";
@@ -191,8 +217,21 @@ namespace HomeAutio.Mqtt.Harmony
             hub.Devices.Add(hubDevice);
 
             // Publish out device information for subscribers
-            MqttClient.Publish(TopicRoot + "/homeAutio", Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(hub, new JsonSerializerSettings() { TypeNameHandling = TypeNameHandling.All })), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
-            MqttClient.Publish(TopicRoot + "/activity", Encoding.UTF8.GetBytes(currentActivity), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, true);
+            await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
+                .WithTopic(TopicRoot + "/homeAutio")
+                .WithPayload(JsonConvert.SerializeObject(hub, new JsonSerializerSettings() { TypeNameHandling = TypeNameHandling.All }))
+                .WithAtLeastOnceQoS()
+                .WithRetainFlag()
+                .Build())
+                .ConfigureAwait(false);
+
+            await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
+                .WithTopic(TopicRoot + "/activity")
+                .WithPayload(currentActivity)
+                .WithAtLeastOnceQoS()
+                .WithRetainFlag()
+                .Build())
+                .ConfigureAwait(false);
         }
 
         #endregion
