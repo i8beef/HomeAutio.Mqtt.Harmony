@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
     <PackageProjectUrl>https://github.com/i8beef/HomeAutio.Mqtt.Harmony</PackageProjectUrl>
     <PackageLicenseUrl>https://github.com/i8beef/HomeAutio.Mqtt.Harmony/blob/master/LICENSE</PackageLicenseUrl>
     <Company></Company>
@@ -15,11 +15,11 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DocumentationFile>bin\Debug\netcoreapp2.0\HomeAutio.Mqtt.Harmony.xml</DocumentationFile>
+    <DocumentationFile>bin\Debug\netcoreapp2.1\HomeAutio.Mqtt.Harmony.xml</DocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DocumentationFile>bin\Release\netcoreapp2.0\HomeAutio.Mqtt.Harmony.xml</DocumentationFile>
+    <DocumentationFile>bin\Release\netcoreapp2.1\HomeAutio.Mqtt.Harmony.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
