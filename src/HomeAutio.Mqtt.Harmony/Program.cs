@@ -30,11 +30,15 @@ namespace HomeAutio.Mqtt.Harmony
         /// <returns>Awaitable <see cref="Task" />.</returns>
         public static async Task MainAsync(string[] args)
         {
+            var environmentName = Environment.GetEnvironmentVariable("ENVIRONMENT");
+            if (string.IsNullOrEmpty(environmentName))
+                environmentName = "Development";
+
             // Setup config
             var config = new ConfigurationBuilder()
                 .SetBasePath(Environment.CurrentDirectory)
                 .AddJsonFile("appsettings.json", optional: false)
-                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ENVIRONMENT")}.json", optional: true)
+                .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
                 .Build();
 
             // Setup logging
