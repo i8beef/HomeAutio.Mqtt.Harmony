@@ -9,7 +9,6 @@ using HarmonyHub.Events;
 using HomeAutio.Mqtt.Core;
 using HomeAutio.Mqtt.Core.Entities;
 using HomeAutio.Mqtt.Core.Utilities;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using Newtonsoft.Json;
@@ -36,24 +35,16 @@ namespace HomeAutio.Mqtt.Harmony
         /// <summary>
         /// Initializes a new instance of the <see cref="HarmonyMqttService"/> class.
         /// </summary>
-        /// <param name="applicationLifetime">Application lifetime instance.</param>
         /// <param name="logger">Logging instance.</param>
         /// <param name="harmonyClient">The Harmony client.</param>
         /// <param name="harmonyName">The Harmony name.</param>
-        /// <param name="brokerIp">MQTT broker IP.</param>
-        /// <param name="brokerPort">MQTT broker port.</param>
-        /// <param name="brokerUsername">MQTT broker username.</param>
-        /// <param name="brokerPassword">MQTT broker password.</param>
+        /// <param name="brokerSettings">MQTT broker settings.</param>
         public HarmonyMqttService(
-            IApplicationLifetime applicationLifetime,
             ILogger<HarmonyMqttService> logger,
             Client harmonyClient,
             string harmonyName,
-            string brokerIp,
-            int brokerPort = 1883,
-            string brokerUsername = null,
-            string brokerPassword = null)
-            : base(applicationLifetime, logger, brokerIp, brokerPort, brokerUsername, brokerPassword, "harmony/" + harmonyName)
+            BrokerSettings brokerSettings)
+            : base(logger, brokerSettings, "harmony/" + harmonyName)
         {
             _log = logger;
             _topicActionMap = new Dictionary<string, string>();
@@ -67,8 +58,8 @@ namespace HomeAutio.Mqtt.Harmony
             _client.CurrentActivityUpdated += Harmony_CurrentActivityUpdated;
 
             // Harmony client logging
-            _client.MessageSent += (object sender, MessageSentEventArgs e) => { _log.LogDebug("Harmony Message sent: " + e.Message); };
-            _client.MessageReceived += (object sender, MessageReceivedEventArgs e) => { _log.LogDebug("Harmony Message received: " + e.Message); };
+            _client.MessageSent += (object sender, MessageSentEventArgs e) => { _log.LogInformation("Harmony Message sent: " + e.Message); };
+            _client.MessageReceived += (object sender, MessageReceivedEventArgs e) => { _log.LogInformation("Harmony Message received: " + e.Message); };
             _client.Error += (object sender, System.IO.ErrorEventArgs e) =>
             {
                 var exception = e.GetException();
@@ -106,7 +97,7 @@ namespace HomeAutio.Mqtt.Harmony
         protected override async void Mqtt_MqttMsgPublishReceived(object sender, MqttApplicationMessageReceivedEventArgs e)
         {
             var message = e.ApplicationMessage.ConvertPayloadToString();
-            _log.LogDebug("MQTT message received for topic " + e.ApplicationMessage.Topic + ": " + message);
+            _log.LogInformation("MQTT message received for topic " + e.ApplicationMessage.Topic + ": " + message);
 
             if (e.ApplicationMessage.Topic == TopicRoot + "/activity/set")
             {
@@ -140,7 +131,7 @@ namespace HomeAutio.Mqtt.Harmony
         private async void Harmony_CurrentActivityUpdated(object sender, ActivityUpdatedEventArgs e)
         {
             var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == e.Id.ToString())?.Label;
-            _log.LogDebug("Harmony current activity updated: " + currentActivity);
+            _log.LogInformation("Harmony current activity updated: " + currentActivity);
 
             await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
                 .WithTopic(TopicRoot + "/activity")

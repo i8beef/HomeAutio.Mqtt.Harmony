@@ -34,6 +34,7 @@ namespace HomeAutio.Mqtt.Harmony
             var config = new ConfigurationBuilder()
                 .SetBasePath(Environment.CurrentDirectory)
                 .AddJsonFile("appsettings.json", optional: false)
+                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ENVIRONMENT")}.json", optional: true)
                 .Build();
 
             // Setup logging
@@ -51,6 +52,10 @@ namespace HomeAutio.Mqtt.Harmony
                 Log.Logger.Fatal(ex, ex.Message);
                 throw;
             }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
         }
 
         /// <summary>
@@ -66,25 +71,24 @@ namespace HomeAutio.Mqtt.Harmony
                 .ConfigureServices((hostContext, services) =>
                 {
                     // Setup client
-                    services.AddScoped<Client>(serviceProvider =>
-                    {
-                        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-                        return new Client(configuration.GetValue<string>("harmonyHost"));
-                    });
+                    services.AddScoped<Client>(serviceProvider => new Client(config.GetValue<string>("harmony:harmonyHost")));
 
                     // Setup service instance
                     services.AddScoped<IHostedService, HarmonyMqttService>(serviceProvider =>
                     {
-                        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
+                        var brokerSettings = new Core.BrokerSettings
+                        {
+                            BrokerIp = config.GetValue<string>("mqtt:brokerIp"),
+                            BrokerPort = config.GetValue<int>("mqtt:brokerPort"),
+                            BrokerUsername = config.GetValue<string>("mqtt:brokerUsername"),
+                            BrokerPassword = config.GetValue<string>("mqtt:brokerPassword")
+                        };
+
                         return new HarmonyMqttService(
-                            serviceProvider.GetRequiredService<IApplicationLifetime>(),
                             serviceProvider.GetRequiredService<ILogger<HarmonyMqttService>>(),
                             serviceProvider.GetRequiredService<Client>(),
-                            configuration.GetValue<string>("harmonyName"),
-                            configuration.GetValue<string>("brokerIp"),
-                            configuration.GetValue<int>("brokerPort"),
-                            configuration.GetValue<string>("brokerUsername"),
-                            configuration.GetValue<string>("brokerPassword"));
+                            config.GetValue<string>("harmony:harmonyName"),
+                            brokerSettings);
                     });
                 });
         }

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "HomeAutio.Mqtt.Harmony": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
