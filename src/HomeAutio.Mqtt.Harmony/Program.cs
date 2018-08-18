@@ -90,7 +90,7 @@ namespace HomeAutio.Mqtt.Harmony
 
                         return new HarmonyMqttService(
                             serviceProvider.GetRequiredService<ILogger<HarmonyMqttService>>(),
-                            serviceProvider.GetRequiredService<Client>(),
+                            serviceProvider.GetRequiredService<IClient>(),
                             config.GetValue<string>("harmony:harmonyName"),
                             brokerSettings);
                     });
