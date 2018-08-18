@@ -75,7 +75,7 @@ namespace HomeAutio.Mqtt.Harmony
                 .ConfigureServices((hostContext, services) =>
                 {
                     // Setup client
-                    services.AddScoped<Client>(serviceProvider => new Client(config.GetValue<string>("harmony:harmonyHost")));
+                    services.AddScoped<IClient>(serviceProvider => new Client(config.GetValue<string>("harmony:harmonyHost")));
 
                     // Setup service instance
                     services.AddScoped<IHostedService, HarmonyMqttService>(serviceProvider =>

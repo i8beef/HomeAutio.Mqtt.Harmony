@@ -23,7 +23,7 @@ namespace HomeAutio.Mqtt.Harmony
         private ILogger<HarmonyMqttService> _log;
         private bool _disposed = false;
 
-        private Client _client;
+        private IClient _client;
         private string _harmonyName;
         private HarmonyConfig _harmonyConfig;
 
@@ -41,7 +41,7 @@ namespace HomeAutio.Mqtt.Harmony
         /// <param name="brokerSettings">MQTT broker settings.</param>
         public HarmonyMqttService(
             ILogger<HarmonyMqttService> logger,
-            Client harmonyClient,
+            IClient harmonyClient,
             string harmonyName,
             BrokerSettings brokerSettings)
             : base(logger, brokerSettings, "harmony/" + harmonyName)
