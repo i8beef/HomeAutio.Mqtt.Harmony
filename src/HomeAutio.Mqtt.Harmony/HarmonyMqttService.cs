@@ -3,15 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using HarmonyHub;
-using HarmonyHub.Config;
-using HarmonyHub.Events;
 using HomeAutio.Mqtt.Core;
 using HomeAutio.Mqtt.Core.Entities;
 using HomeAutio.Mqtt.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
 using Newtonsoft.Json;
+using HarmonyHub = Harmony;
 
 namespace HomeAutio.Mqtt.Harmony
 {
@@ -23,14 +21,14 @@ namespace HomeAutio.Mqtt.Harmony
         private ILogger<HarmonyMqttService> _log;
         private bool _disposed = false;
 
-        private IClient _client;
+        private HarmonyHub.Hub _client;
         private string _harmonyName;
-        private HarmonyConfig _harmonyConfig;
+        private HarmonyHub.HubSync _harmonyConfig;
 
         /// <summary>
         /// Holds mapping of possible MQTT topics mapped to Harmony command actions they trigger.
         /// </summary>
-        private IDictionary<string, string> _topicActionMap;
+        private IDictionary<string, HarmonyHub.Function> _topicActionMap;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HarmonyMqttService"/> class.
@@ -41,13 +39,13 @@ namespace HomeAutio.Mqtt.Harmony
         /// <param name="brokerSettings">MQTT broker settings.</param>
         public HarmonyMqttService(
             ILogger<HarmonyMqttService> logger,
-            IClient harmonyClient,
+            HarmonyHub.Hub harmonyClient,
             string harmonyName,
             BrokerSettings brokerSettings)
             : base(logger, brokerSettings, "harmony/" + harmonyName)
         {
             _log = logger;
-            _topicActionMap = new Dictionary<string, string>();
+            _topicActionMap = new Dictionary<string, HarmonyHub.Function>();
             SubscribedTopics.Add(TopicRoot + "/devices/+/+/+/set");
             SubscribedTopics.Add(TopicRoot + "/activity/set");
             SubscribedTopics.Add(TopicRoot + "/activity/+/set");
@@ -55,17 +53,7 @@ namespace HomeAutio.Mqtt.Harmony
             // Setup harmony client
             _client = harmonyClient;
             _harmonyName = harmonyName;
-            _client.CurrentActivityUpdated += Harmony_CurrentActivityUpdated;
-
-            // Harmony client logging
-            _client.MessageSent += (object sender, MessageSentEventArgs e) => { _log.LogInformation("Harmony Message sent: " + e.Message); };
-            _client.MessageReceived += (object sender, MessageReceivedEventArgs e) => { _log.LogInformation("Harmony Message received: " + e.Message); };
-            _client.Error += (object sender, System.IO.ErrorEventArgs e) =>
-            {
-                var exception = e.GetException();
-                _log.LogError(exception, exception.Message);
-                throw new Exception("Harmony connection lost");
-            };
+            _client.ActivityProgress += Harmony_CurrentActivityUpdated;
         }
 
         #region Service implementation
@@ -74,7 +62,8 @@ namespace HomeAutio.Mqtt.Harmony
         protected override async Task StartServiceAsync(CancellationToken cancellationToken = default(CancellationToken))
         {
             // Connect to Harmony
-            _client.Connect();
+            await _client.ConnectAsync(HarmonyHub.DeviceID.GetDeviceDefault())
+                .ConfigureAwait(false);
             await GetConfigAsync()
                 .ConfigureAwait(false);
         }
@@ -101,21 +90,48 @@ namespace HomeAutio.Mqtt.Harmony
 
             if (e.ApplicationMessage.Topic == TopicRoot + "/activity/set")
             {
-                var activity = _harmonyConfig?.Activity?.FirstOrDefault(x => x.Label == message);
-                if (activity != null)
+                if (message.ToUpper() == "POWEROFF")
                 {
-                    await _client.StartActivityAsync(int.Parse(activity.Id))
-                        .ConfigureAwait(false);
+                    try
+                    {
+                        await _client.EndActivity()
+                            .ConfigureAwait(false);
+                    }
+                    catch (Exception)
+                    {
+                        // Swallow possible exception when no running activity
+                    }
+                }
+                else
+                {
+                    var activity = _harmonyConfig?.Activities?.FirstOrDefault(x => x.Label == message);
+                    if (activity != null)
+                    {
+                        await _client.StartActivity(activity)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        _log.LogWarning("Could not find activity " + message);
+                    }
                 }
             }
             else if (_topicActionMap.ContainsKey(e.ApplicationMessage.Topic))
             {
-                var command = _topicActionMap[e.ApplicationMessage.Topic];
-                if (command != null)
+                var button = _topicActionMap[e.ApplicationMessage.Topic];
+                if (button != null)
                 {
-                    await _client.SendCommandAsync(command)
+                    await _client.PressButtonAsync(button)
                         .ConfigureAwait(false);
                 }
+                else
+                {
+                    _log.LogWarning("Could not route message to button for topic " + e.ApplicationMessage.Topic);
+                }
+            }
+            else
+            {
+                _log.LogWarning("Could not handle topic " + e.ApplicationMessage.Topic);
             }
         }
 
@@ -128,18 +144,21 @@ namespace HomeAutio.Mqtt.Harmony
         /// </summary>
         /// <param name="sender">Event sender.</param>
         /// <param name="e">Event args.</param>
-        private async void Harmony_CurrentActivityUpdated(object sender, ActivityUpdatedEventArgs e)
+        private async void Harmony_CurrentActivityUpdated(object sender, HarmonyHub.ActivityProgressEventArgs e)
         {
-            var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == e.Id.ToString())?.Label;
-            _log.LogInformation("Harmony current activity updated: " + currentActivity);
+            if (e.Progress == 1)
+            {
+                var currentActivity = e.Activity.Label;
+                _log.LogInformation("Harmony current activity updated: " + currentActivity);
 
-            await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
-                .WithTopic(TopicRoot + "/activity")
-                .WithPayload(currentActivity)
-                .WithAtLeastOnceQoS()
-                .WithRetainFlag()
-                .Build())
-                .ConfigureAwait(false);
+                await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
+                    .WithTopic(TopicRoot + "/activity")
+                    .WithPayload(currentActivity)
+                    .WithAtLeastOnceQoS()
+                    .WithRetainFlag()
+                    .Build())
+                    .ConfigureAwait(false);
+            }
         }
 
         /// <summary>
@@ -148,8 +167,10 @@ namespace HomeAutio.Mqtt.Harmony
         /// <returns>An awaitable <see cref="Task"/>.</returns>
         private async Task GetConfigAsync()
         {
-            _harmonyConfig = await _client.GetConfigAsync()
+            await _client.SyncConfigurationAsync()
                 .ConfigureAwait(false);
+
+            _harmonyConfig = _client.Sync;
 
             // Wipe topic to Harmony action map for reload
             if (_topicActionMap.Count > 0)
@@ -159,19 +180,19 @@ namespace HomeAutio.Mqtt.Harmony
 
             // Map all devices at {TopicRoot}/devices/{deviceLabel}/{controlGroup}/{controlName}/set
             // Listen at topic {TopicRoot}/devices/+/+/+/set
-            foreach (var harmonyDevice in _harmonyConfig.Device)
+            foreach (var harmonyDevice in _harmonyConfig.Devices)
             {
                 var device = new Device { Name = harmonyDevice.Label };
-                foreach (var controlGroup in harmonyDevice.ControlGroup)
+                foreach (var controlGroup in harmonyDevice.ControlGroups)
                 {
-                    foreach (var control in controlGroup.Function)
+                    foreach (var function in controlGroup.Functions)
                     {
-                        var commandTopic = $"{TopicRoot}/devices/{harmonyDevice.Label.Sluggify()}/{controlGroup.Name.Sluggify()}/{control.Name.Sluggify()}/set";
-                        device.Controls.Add(new ButtonControl { Name = controlGroup.Name + " " + control.Name, CommandTopic = commandTopic });
+                        var commandTopic = $"{TopicRoot}/devices/{harmonyDevice.Label.Sluggify()}/{controlGroup.Name.Sluggify()}/{function.Name.Sluggify()}/set";
+                        device.Controls.Add(new ButtonControl { Name = controlGroup.Name + " " + function.Name, CommandTopic = commandTopic });
 
                         // Add mapping for subscribed topic to Harmony control action, ignoring duplicates
                         if (!_topicActionMap.ContainsKey(commandTopic))
-                            _topicActionMap.Add(commandTopic, control.Action);
+                            _topicActionMap.Add(commandTopic, function);
                     }
                 }
 
@@ -184,10 +205,9 @@ namespace HomeAutio.Mqtt.Harmony
 
             // Map activities
             var activitySelections = new Dictionary<string, string>();
-            foreach (var activity in _harmonyConfig.Activity)
+            foreach (var activity in _harmonyConfig.Activities)
             {
                 var commandTopic = $"{TopicRoot}/activity/{activity.Label.Sluggify()}/set";
-                _topicActionMap.Add(commandTopic, activity.Id);
                 hubDevice.Controls.Add(new ButtonControl { Name = "Activity: " + activity.Label, CommandTopic = commandTopic });
 
                 activitySelections.Add(activity.Label, activity.Label);
@@ -195,15 +215,12 @@ namespace HomeAutio.Mqtt.Harmony
 
             // Add a Selector for the hub itself at {TopicRoot}/activity/set
             // Listen at topic {TopicRoot}/activity/set
-            var currentActivityId = await _client.GetCurrentActivityIdAsync()
+            var currentActivity = await _client.GetRunningActivity()
                 .ConfigureAwait(false);
-            var currentActivity = _harmonyConfig.Activity.FirstOrDefault(x => x.Id == currentActivityId.ToString())?.Label;
             var activityStateTopic = $"{TopicRoot}/activity";
             var activityCommandTopic = $"{TopicRoot}/activity/set";
-            _topicActionMap.Add(activityCommandTopic, "Activity");
 
-            hubDevice.Controls.Add(new SensorControl { ValueTopic = activityStateTopic });
-            hubDevice.Controls.Add(new SelectorControl { CommandTopic = activityCommandTopic, ValueTopic = activityStateTopic, SelectionLabels = activitySelections });
+            hubDevice.Controls.Add(new SelectorControl { Name = "Activity", CommandTopic = activityCommandTopic, ValueTopic = activityStateTopic, SelectionLabels = activitySelections });
 
             hub.Devices.Add(hubDevice);
 
@@ -218,7 +235,7 @@ namespace HomeAutio.Mqtt.Harmony
 
             await MqttClient.PublishAsync(new MqttApplicationMessageBuilder()
                 .WithTopic(TopicRoot + "/activity")
-                .WithPayload(currentActivity)
+                .WithPayload(currentActivity.Label)
                 .WithAtLeastOnceQoS()
                 .WithRetainFlag()
                 .Build())
@@ -241,7 +258,7 @@ namespace HomeAutio.Mqtt.Harmony
             if (disposing)
             {
                 if (_client != null)
-                    _client.Dispose();
+                    _client.Disconnect();
             }
 
             _disposed = true;

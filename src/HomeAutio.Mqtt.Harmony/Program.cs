@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
-using HarmonyHub;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using HarmonyHub = Harmony;
 
 namespace HomeAutio.Mqtt.Harmony
 {
@@ -48,7 +49,9 @@ namespace HomeAutio.Mqtt.Harmony
 
             try
             {
-                var hostBuilder = CreateHostBuilder(config);
+                var hubInfo = await DiscoverHubInfoAsync(config.GetValue<string>("harmony:harmonyHost"));
+
+                var hostBuilder = CreateHostBuilder(config, hubInfo);
                 await hostBuilder.RunConsoleAsync();
             }
             catch (Exception ex)
@@ -66,16 +69,19 @@ namespace HomeAutio.Mqtt.Harmony
         /// Creates an <see cref="IHostBuilder"/>.
         /// </summary>
         /// <param name="config">External configuration.</param>
+        /// <param name="hubInfo">Hub info.</param>
         /// <returns>A configured <see cref="IHostBuilder"/>.</returns>
-        private static IHostBuilder CreateHostBuilder(IConfiguration config)
+        private static IHostBuilder CreateHostBuilder(IConfiguration config, HarmonyHub.HubInfo hubInfo)
         {
+            if (hubInfo == null) throw new ArgumentNullException(nameof(hubInfo));
+
             return new HostBuilder()
                 .ConfigureAppConfiguration((hostContext, configuration) => configuration.AddConfiguration(config))
                 .ConfigureLogging((hostingContext, logging) => logging.AddSerilog())
                 .ConfigureServices((hostContext, services) =>
                 {
                     // Setup client
-                    services.AddScoped<IClient>(serviceProvider => new Client(config.GetValue<string>("harmony:harmonyHost")));
+                    services.AddScoped(serviceProvider => new HarmonyHub.Hub(hubInfo));
 
                     // Setup service instance
                     services.AddScoped<IHostedService, HarmonyMqttService>(serviceProvider =>
@@ -90,11 +96,48 @@ namespace HomeAutio.Mqtt.Harmony
 
                         return new HarmonyMqttService(
                             serviceProvider.GetRequiredService<ILogger<HarmonyMqttService>>(),
-                            serviceProvider.GetRequiredService<IClient>(),
+                            serviceProvider.GetRequiredService<HarmonyHub.Hub>(),
                             config.GetValue<string>("harmony:harmonyName"),
                             brokerSettings);
                     });
                 });
+        }
+
+        /// <summary>
+        /// Uses discovery to find the hub on the network.
+        /// </summary>
+        /// <param name="harmonyIp">Expected IP address of hub.</param>
+        /// <returns>A <see cref="HarmonyHub.HubInfo" />.</returns>
+        private static async Task<HarmonyHub.HubInfo> DiscoverHubInfoAsync(string harmonyIp)
+        {
+            var discoveryService = new HarmonyHub.DiscoveryService();
+            var waitCancellationToken = new CancellationTokenSource();
+            HarmonyHub.HubInfo hubInfo = null;
+            discoveryService.HubFound += (sender, e) =>
+            {
+                if (e.HubInfo.IP == harmonyIp)
+                {
+                    Log.Logger.Information("Found hub " + e.HubInfo.IP + " (" + e.HubInfo.RemoteId + ")");
+                    hubInfo = e.HubInfo;
+                    waitCancellationToken.Cancel();
+                }
+            };
+
+            // Run discovery for 30 seconds
+            discoveryService.StartDiscovery();
+
+            try
+            {
+                await Task.Delay(30000, waitCancellationToken.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // token has been canceled. exit
+            }
+
+            discoveryService.StopDiscovery();
+
+            return hubInfo;
         }
     }
 }

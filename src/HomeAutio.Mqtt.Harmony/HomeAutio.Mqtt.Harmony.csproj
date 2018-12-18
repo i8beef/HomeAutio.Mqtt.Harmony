@@ -29,10 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Harmony.NET" Version="0.1.2" />
     <PackageReference Include="I8Beef.CodeAnalysis.RuleSet" Version="1.0.15">
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="HarmonyHub" Version="3.0.0.5" />
     <PackageReference Include="HomeAutio.Mqtt.Core" Version="3.0.0.43" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="2.1.1" />
