@@ -33,7 +33,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="HarmonyHub" Version="3.0.0.10" />
-    <PackageReference Include="HomeAutio.Mqtt.Core" Version="3.0.0.45" />
+    <PackageReference Include="HomeAutio.Mqtt.Core" Version="3.0.0.51" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="2.1.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="2.1.1" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="2.0.2" />

@@ -25,6 +25,7 @@ namespace HomeAutio.Mqtt.Harmony
 
         private IClient _client;
         private string _harmonyName;
+        private int _harmonyKeyPressLength;
         private HarmonyConfig _harmonyConfig;
 
         /// <summary>
@@ -38,11 +39,13 @@ namespace HomeAutio.Mqtt.Harmony
         /// <param name="logger">Logging instance.</param>
         /// <param name="harmonyClient">The Harmony client.</param>
         /// <param name="harmonyName">The Harmony name.</param>
+        /// <param name="harmonyKeyPressLength">The Harmony key press length.</param>
         /// <param name="brokerSettings">MQTT broker settings.</param>
         public HarmonyMqttService(
             ILogger<HarmonyMqttService> logger,
             IClient harmonyClient,
             string harmonyName,
+            int harmonyKeyPressLength,
             BrokerSettings brokerSettings)
             : base(logger, brokerSettings, "harmony/" + harmonyName)
         {
@@ -55,6 +58,7 @@ namespace HomeAutio.Mqtt.Harmony
             // Setup harmony client
             _client = harmonyClient;
             _harmonyName = harmonyName;
+            _harmonyKeyPressLength = harmonyKeyPressLength;
             _client.CurrentActivityUpdated += Harmony_CurrentActivityUpdated;
 
             // Harmony client logging
@@ -113,7 +117,7 @@ namespace HomeAutio.Mqtt.Harmony
                 var command = _topicActionMap[e.ApplicationMessage.Topic];
                 if (command != null)
                 {
-                    await _client.SendCommandAsync(command)
+                    await _client.SendKeyPressAsync(command, _harmonyKeyPressLength)
                         .ConfigureAwait(false);
                 }
             }
