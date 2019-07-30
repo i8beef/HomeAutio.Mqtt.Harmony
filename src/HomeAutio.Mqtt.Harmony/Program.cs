@@ -138,7 +138,7 @@ namespace HomeAutio.Mqtt.Harmony
                             serviceProvider.GetRequiredService<ILogger<HarmonyMqttService>>(),
                             serviceProvider.GetRequiredService<IClient>(),
                             config.GetValue<string>("harmony:harmonyName"),
-                            config.GetValue<int>("harmony:harmonyKeyPressLength", 100),
+                            config.GetValue<int>("harmony:harmonyKeyPressLength", 300),
                             brokerSettings);
                     });
                 });
