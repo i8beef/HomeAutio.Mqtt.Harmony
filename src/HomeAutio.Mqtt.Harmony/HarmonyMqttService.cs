@@ -11,6 +11,7 @@ using HomeAutio.Mqtt.Core.Entities;
 using HomeAutio.Mqtt.Core.Utilities;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
+using MQTTnet.Extensions.ManagedClient;
 using Newtonsoft.Json;
 
 namespace HomeAutio.Mqtt.Harmony
@@ -20,18 +21,19 @@ namespace HomeAutio.Mqtt.Harmony
     /// </summary>
     public class HarmonyMqttService : ServiceBase
     {
-        private ILogger<HarmonyMqttService> _log;
-        private bool _disposed = false;
-
-        private IClient _client;
-        private string _harmonyName;
-        private int _harmonyKeyPressLength;
-        private HarmonyConfig _harmonyConfig;
+        private readonly ILogger<HarmonyMqttService> _log;
 
         /// <summary>
         /// Holds mapping of possible MQTT topics mapped to Harmony command actions they trigger.
         /// </summary>
-        private IDictionary<string, string> _topicActionMap;
+        private readonly IDictionary<string, string> _topicActionMap;
+
+        private readonly IClient _client;
+        private readonly string _harmonyName;
+        private readonly int _harmonyKeyPressLength;
+        private HarmonyConfig _harmonyConfig;
+
+        private bool _disposed = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HarmonyMqttService"/> class.
@@ -75,7 +77,7 @@ namespace HomeAutio.Mqtt.Harmony
         #region Service implementation
 
         /// <inheritdoc />
-        protected override async Task StartServiceAsync(CancellationToken cancellationToken = default(CancellationToken))
+        protected override async Task StartServiceAsync(CancellationToken cancellationToken = default)
         {
             // Connect to Harmony
             _client.Connect();
@@ -84,7 +86,7 @@ namespace HomeAutio.Mqtt.Harmony
         }
 
         /// <inheritdoc />
-        protected override Task StopServiceAsync(CancellationToken cancellationToken = default(CancellationToken))
+        protected override Task StopServiceAsync(CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }
@@ -96,9 +98,8 @@ namespace HomeAutio.Mqtt.Harmony
         /// <summary>
         /// Handles commands for the Harmony published to MQTT.
         /// </summary>
-        /// <param name="sender">Event sender.</param>
         /// <param name="e">Event args.</param>
-        protected override async void Mqtt_MqttMsgPublishReceived(object sender, MqttApplicationMessageReceivedEventArgs e)
+        protected override async void Mqtt_MqttMsgPublishReceived(MqttApplicationMessageReceivedEventArgs e)
         {
             var message = e.ApplicationMessage.ConvertPayloadToString();
             _log.LogInformation("MQTT message received for topic " + e.ApplicationMessage.Topic + ": " + message);
