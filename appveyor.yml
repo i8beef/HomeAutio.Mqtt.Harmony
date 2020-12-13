@@ -20,9 +20,9 @@ build_script:
 
     dotnet publish -c Release src/HomeAutio.Mqtt.Harmony.sln
 artifacts:
-- path: src\HomeAutio.Mqtt.Harmony\bin\$(configuration)\netcoreapp3.1\publish
+- path: src\HomeAutio.Mqtt.Harmony\bin\$(configuration)\net5.0\publish
   name: HomeAutio.Mqtt.Harmony-$(appveyor_build_version)
 deploy:
 - provider: GitHub
   auth_token: $(GITHUB_API_KEY)
-  artifact: src\HomeAutio.Mqtt.Harmony\bin\$(configuration)\netcoreapp3.1\HomeAutio.Mqtt.Harmony-$(appveyor_build_version).zip
+  artifact: src\HomeAutio.Mqtt.Harmony\bin\$(configuration)\net5.0\HomeAutio.Mqtt.Harmony-$(appveyor_build_version).zip
