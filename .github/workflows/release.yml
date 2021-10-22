@@ -91,18 +91,18 @@ jobs:
 
   docker-build:
     needs: release
-      strategy:
-        matrix:
-          include:
-            -
-              docker-file: "./src/Dockerfile"
-              docker-tag: "amd64"
-            -
-              docker-file: "./src/Dockerfile.arm64"
-              docker-tag: "arm64"
-            -
-              docker-file: "./src/Dockerfile.arm32"
-              docker-tag: "arm32"
+    strategy:
+      matrix:
+        include:
+          -
+            docker-file: "./src/Dockerfile"
+            docker-tag: "amd64"
+          -
+            docker-file: "./src/Dockerfile.arm64"
+            docker-tag: "arm64"
+          -
+            docker-file: "./src/Dockerfile.arm32"
+            docker-tag: "arm32"
     runs-on: ubuntu-latest    
     steps:
       - name: Checkout repository
