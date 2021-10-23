@@ -1,5 +1,6 @@
 ARG VERSION=1.0.0.0
 FROM mcr.microsoft.com/dotnet/sdk:5.0-alpine AS build
+ARG VERSION
 WORKDIR /app
 
 # copy csproj and restore as distinct layers
