@@ -139,6 +139,7 @@ jobs:
         with:
           context: ./src
           file: ${{ matrix.docker-file }}
+          build-args: VERSION=${{ steps.version.outputs.version-without-v }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
