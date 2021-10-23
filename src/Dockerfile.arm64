@@ -10,7 +10,7 @@ RUN dotnet restore
 
 # copy and build everything else
 COPY HomeAutio.Mqtt.Harmony/. ./HomeAutio.Mqtt.Harmony/
-RUN dotnet build -c Release /p:Version=${VERSION}
+RUN dotnet build --configuration Release /p:Version=$VERSION
 
 # publish
 FROM build AS publish
