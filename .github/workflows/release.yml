@@ -122,7 +122,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${{ env.DOCKER_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}
           tags: |
             type=raw,value=${{ steps.version.outputs.version-without-v }}-${{ matrix.docker-tag }}
             type=raw,value=latest-${{ matrix.docker-tag }}
@@ -160,31 +160,31 @@ jobs:
 
       - name: Pull Docker images
         run: |
-          docker pull ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-amd64
-          docker pull ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm32
-          docker pull ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm64
-          docker pull ${{ env.DOCKER_NAME }}:latest-amd64
-          docker pull ${{ env.DOCKER_NAME }}:latest-arm32
-          docker pull ${{ env.DOCKER_NAME }}:latest-arm64
+          docker pull ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-amd64
+          docker pull ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm32
+          docker pull ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm64
+          docker pull ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest-amd64
+          docker pull ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest-arm32
+          docker pull ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest-arm64
 
       - name: Build Docker latest image manifest
         run: |
           docker manifest create \
-            ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }} \
-            --amend ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-amd64 \
-            --amend ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm32 \
-            --amend ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm64
+            ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }} \
+            --amend ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-amd64 \
+            --amend ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm32 \
+            --amend ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}-arm64
 
       - name: Push Docker version image manifest
-        run: docker manifest push --purge ${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}
+        run: docker manifest push --purge ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:${{ steps.version.outputs.version-without-v }}
 
       - name: Build Docker latest image manifest
         run: |
           docker manifest create \
-            ${{ env.DOCKER_NAME }}:latest \
-            --amend ${{ env.DOCKER_NAME }}:latest-amd64 \
-            --amend ${{ env.DOCKER_NAME }}:latest-arm32 \
-            --amend ${{ env.DOCKER_NAME }}:latest-arm64
+            ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest \
+            --amend ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest-amd64 \
+            --amend ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest-arm32 \
+            --amend ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest-arm64
 
       - name: Push Docker latest image manifest
-        run: docker manifest push --purge ${{ env.DOCKER_NAME }}:latest
+        run: docker manifest push --purge ${{ env.REGISTRY }}/${{ env.DOCKER_NAME }}:latest
